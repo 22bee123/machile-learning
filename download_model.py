@@ -1,6 +1,11 @@
 import os
 import requests
 
+<<<<<<< HEAD
+=======
+import requests
+import os
+>>>>>>> 77356108a845751b864446703a57107a29ad2aa7
 
 def download_file_from_google_drive(id, destination):
     URL = "https://docs.google.com/uc?export=download"
