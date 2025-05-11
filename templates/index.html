@@ -324,7 +324,7 @@
             <div class="header-content">
                 <div class="logo">
                     <i class="fas fa-leaf"></i>
-                    Crop Disease Detection
+                    Plant Disease Detection
                 </div>
             </div>
         </div>
@@ -360,14 +360,7 @@
                         </div>
                     </div>
                     
-                    <div class="live-status">
-                        <div class="live-status-title">
-                            <i class="fas fa-chart-line"></i>
-                            <span>Live Detection Results</span>
-                        </div>
-                        <h3 id="detection-summary">Analyzing...</h3>
-                        <ul class="detection-list" id="detection-list"></ul>
-                    </div>
+                   
                 </div>
             </div>
         </div>
@@ -375,7 +368,7 @@
     
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2023 Crop Disease Detection System | Powered by YOLOv8 and Flask</p>
+            <p>&copy; 2025 Crop Disease Detection System | Powered by YOLOv8 and Flask</p>
         </div>
     </footer>
     
@@ -429,57 +422,8 @@
                 });
             });
             
-            // Live status polling
-            function startLiveStatusPolling() {
-                // Poll for status updates every 500ms
-                setInterval(updateLiveStatus, 500);
-            }
-            
-            function updateLiveStatus() {
-                fetch('/live_status')
-                    .then(response => response.json())
-                    .then(data => {
-                        // Update detection summary
-                        detectionSummary.textContent = data.summary;
-                        
-                        // Update detection list
-                        detectionList.innerHTML = '';
-                        
-                        if (data.detections.length > 0) {
-                            // Only display actual diseases, not just leaf detections
-                            data.detections.forEach(detection => {
-                                // Skip leaf detections
-                                const className = detection.class.toLowerCase();
-                                if (className.endsWith("leaf") || className.endsWith("leafs")) {
-                                    return; // Skip this detection
-                                }
-                                
-                                const li = document.createElement('li');
-                                li.className = 'detection-item';
-                                
-                                // Determine confidence class
-                                let confidenceClass = 'confidence-medium';
-                                if (detection.confidence > 0.7) {
-                                    confidenceClass = 'confidence-high';
-                                } else if (detection.confidence < 0.5) {
-                                    confidenceClass = 'confidence-low';
-                                }
-                                
-                                li.innerHTML = `
-                                    <span>${detection.class}</span>
-                                    <span class="confidence-badge ${confidenceClass}">
-                                        ${(detection.confidence * 100).toFixed(1)}%
-                                    </span>
-                                `;
-                                detectionList.appendChild(li);
-                            });
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error fetching live status:', error);
-                    });
-            }
-            
+
+   
             // Toast function
             function showToast(message, type = 'success') {
                 toast.className = `toast show toast-${type}`;
