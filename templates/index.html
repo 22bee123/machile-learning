@@ -342,13 +342,22 @@
                 </div>
                 
                 <div class="card-body">
-                    <div class="stream-container">
-                        <img src="{{ url_for('video_feed') }}" class="video-stream" id="video-stream">
-                        <div class="placeholder-text" id="placeholder-text">
-                            <i class="fas fa-camera fa-2x"></i>
-                            <p>Video stream loading...</p>
-                        </div>
-                    </div>
+                    <div class="stream-container" id="webcam-container">
+    <video id="user-webcam" class="video-stream" autoplay playsinline></video>
+    <canvas id="capture-canvas" style="display:none;"></canvas>
+    <div class="placeholder-text" id="webcam-placeholder">
+        <i class="fas fa-camera fa-2x"></i>
+        <p>Allow access to your webcam and click "Capture & Analyze"</p>
+    </div>
+</div>
+<div style="margin-top:1rem; text-align:center;">
+    <button id="capture-btn" style="padding:0.75rem 2rem; font-size:1rem; background-color:var(--primary-color); color:white; border:none; border-radius:6px; cursor:pointer;">Capture & Analyze</button>
+</div>
+<div id="result-container" style="margin-top:1.5rem; text-align:center; display:none;">
+    <h3>Detection Result</h3>
+    <img id="annotated-image" style="max-width:100%; border-radius:6px; box-shadow:var(--card-shadow);" />
+    <div id="result-details"></div>
+</div>
                     
                     <div class="confidence-control">
                         <div class="slider-container">
@@ -381,11 +390,75 @@
             // Elements
             const confidenceSlider = document.getElementById('confidence-slider');
             const confidenceValue = document.getElementById('confidence-value');
-            const videoStream = document.getElementById('video-stream');
-            const placeholderText = document.getElementById('placeholder-text');
-            const detectionSummary = document.getElementById('detection-summary');
-            const detectionList = document.getElementById('detection-list');
+            const webcam = document.getElementById('user-webcam');
+            const canvas = document.getElementById('capture-canvas');
+            const captureBtn = document.getElementById('capture-btn');
+            const webcamPlaceholder = document.getElementById('webcam-placeholder');
+            const resultContainer = document.getElementById('result-container');
+            const annotatedImg = document.getElementById('annotated-image');
+            const resultDetails = document.getElementById('result-details');
             const toast = document.getElementById('toast');
+
+            // Hide server-side stream (for remote use)
+            const videoStream = document.getElementById('video-stream');
+            if (videoStream) videoStream.style.display = 'none';
+            const placeholderText = document.getElementById('placeholder-text');
+            if (placeholderText) placeholderText.style.display = 'none';
+
+            // Access user's webcam
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(function(stream) {
+                        webcam.srcObject = stream;
+                        webcamPlaceholder.style.display = 'none';
+                    })
+                    .catch(function(err) {
+                        webcamPlaceholder.innerHTML = '<i class="fas fa-exclamation-circle fa-2x"></i><p>Could not access webcam.<br>' + err.message + '</p>';
+                    });
+            } else {
+                webcamPlaceholder.innerHTML = '<i class="fas fa-exclamation-circle fa-2x"></i><p>Webcam not supported in this browser.</p>';
+            }
+
+            captureBtn.addEventListener('click', function() {
+                // Draw current frame to canvas
+                canvas.width = webcam.videoWidth;
+                canvas.height = webcam.videoHeight;
+                canvas.getContext('2d').drawImage(webcam, 0, 0, canvas.width, canvas.height);
+                // Convert to base64
+                const dataURL = canvas.toDataURL('image/jpeg');
+                // Send to backend
+                fetch('/detect_image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: dataURL, confidence: parseFloat(confidenceSlider.value) })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        showToast('Detection failed: ' + data.error, 'error');
+                        return;
+                    }
+                    // Show annotated image
+                    annotatedImg.src = data.annotated_image;
+                    // Show detection details
+                    let html = '';
+                    if (data.disease_detections && data.disease_detections.length > 0) {
+                        html += `<ul style='list-style:none; padding:0;'>`;
+                        data.disease_detections.forEach(det => {
+                            html += `<li><b>${det.class}</b> - ${(det.confidence*100).toFixed(1)}%</li>`;
+                        });
+                        html += `</ul>`;
+                    } else {
+                        html = '<p>No diseases detected - Plant appears healthy</p>';
+                    }
+                    resultDetails.innerHTML = html;
+                    resultContainer.style.display = '';
+                    showToast('Detection complete!', 'success');
+                })
+                .catch(err => {
+                    showToast('Detection failed: ' + err, 'error');
+                });
+            });
             
             // Hide placeholder when stream loads
             videoStream.onload = function() {

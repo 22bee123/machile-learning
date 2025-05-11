@@ -7,8 +7,10 @@ from datetime import datetime
 from ultralytics import YOLO
 from pathlib import Path
 import base64
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 # Load the trained model
 model_path = os.path.join("crop-disease-detection-using-yolov8", "Crop Disease Detection Using YOLOv8", "runs", "detect", "train3", "weights", "best.pt")
@@ -146,8 +148,43 @@ def shutdown():
     func()
     return 'Server shutting down...'
 
+@app.route('/detect_image', methods=['POST'])
+def detect_image():
+    try:
+        if 'image' in request.files:
+            # Image sent as file
+            file = request.files['image']
+            npimg = np.frombuffer(file.read(), np.uint8)
+            img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+        else:
+            # Image sent as base64
+            data = request.get_json()
+            if data and 'image' in data:
+                image_data = data['image']
+                header, encoded = image_data.split(',', 1) if ',' in image_data else ('', image_data)
+                img_bytes = base64.b64decode(encoded)
+                npimg = np.frombuffer(img_bytes, np.uint8)
+                img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+            else:
+                return jsonify({'error': 'No image provided'}), 400
+        conf = float(request.form.get('confidence', 0.5)) if 'confidence' in request.form else float(request.args.get('confidence', 0.5))
+        result = process_image(img, conf)
+        # Encode annotated image to base64
+        _, buffer = cv2.imencode('.jpg', result['annotated_image'])
+        annotated_b64 = base64.b64encode(buffer).decode('utf-8')
+        return jsonify({
+            'detections': result['detections'],
+            'disease_detections': result['disease_detections'],
+            'num_detections': result['num_detections'],
+            'num_disease_detections': result['num_disease_detections'],
+            'avg_confidence': result['avg_confidence'],
+            'annotated_image': f"data:image/jpeg;base64,{annotated_b64}"
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     try:
         app.run(debug=True)
     finally:
-        release_camera() 
+        release_camera()
