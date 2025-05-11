@@ -346,13 +346,11 @@
     <video id="user-webcam" class="video-stream" autoplay playsinline></video>
     <canvas id="capture-canvas" style="display:none;"></canvas>
     <div class="placeholder-text" id="webcam-placeholder">
-        <i class="fas fa-camera fa-2x"></i>
-        <p>Allow access to your webcam and click "Capture & Analyze"</p>
-    </div>
+    <i class="fas fa-camera fa-2x"></i>
+    <p>Allow access to your webcam for live analysis</p>
 </div>
-<div style="margin-top:1rem; text-align:center;">
-    <button id="capture-btn" style="padding:0.75rem 2rem; font-size:1rem; background-color:var(--primary-color); color:white; border:none; border-radius:6px; cursor:pointer;">Capture & Analyze</button>
 </div>
+
 <div id="result-container" style="margin-top:1.5rem; text-align:center; display:none;">
     <h3>Detection Result</h3>
     <img id="annotated-image" style="max-width:100%; border-radius:6px; box-shadow:var(--card-shadow);" />
@@ -392,7 +390,6 @@
             const confidenceValue = document.getElementById('confidence-value');
             const webcam = document.getElementById('user-webcam');
             const canvas = document.getElementById('capture-canvas');
-            const captureBtn = document.getElementById('capture-btn');
             const webcamPlaceholder = document.getElementById('webcam-placeholder');
             const resultContainer = document.getElementById('result-container');
             const annotatedImg = document.getElementById('annotated-image');
@@ -411,12 +408,48 @@
                     .then(function(stream) {
                         webcam.srcObject = stream;
                         webcamPlaceholder.style.display = 'none';
+                        // Start automatic detection when webcam is ready
+                        startAutomaticDetection();
                     })
                     .catch(function(err) {
                         webcamPlaceholder.innerHTML = '<i class="fas fa-exclamation-circle fa-2x"></i><p>Could not access webcam.<br>' + err.message + '</p>';
                     });
             } else {
                 webcamPlaceholder.innerHTML = '<i class="fas fa-exclamation-circle fa-2x"></i><p>Webcam not supported in this browser.</p>';
+            }
+
+            // Automatic detection loop
+            function startAutomaticDetection() {
+                setInterval(() => {
+                    captureAndAnalyze();
+                }, 1000); // every 1 second
+            }
+
+            function captureAndAnalyze() {
+                if (!webcam.srcObject) return;
+                // Draw the current frame from the video to the canvas
+                canvas.width = webcam.videoWidth;
+                canvas.height = webcam.videoHeight;
+                canvas.getContext('2d').drawImage(webcam, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob(function(blob) {
+                    if (!blob) return;
+                    const formData = new FormData();
+                    formData.append('image', blob, 'frame.jpg');
+                    fetch('/detect_image', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Show result
+                        resultContainer.style.display = 'block';
+                        annotatedImg.src = 'data:image/jpeg;base64,' + data.annotated_image;
+                        resultDetails.innerHTML = data.details_html || '';
+                    })
+                    .catch(error => {
+                        console.error('Detection error:', error);
+                    });
+                }, 'image/jpeg');
             }
 
             captureBtn.addEventListener('click', function() {
