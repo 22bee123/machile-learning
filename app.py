@@ -37,8 +37,9 @@ def release_camera():
 def process_image(image, conf_threshold=0.5):
     """Process a single image with the YOLOv8 model and return results"""
     global live_detections, detection_summary
-    
-    results = model(image, conf=conf_threshold)
+    # Resize image to 320x320 for lower memory usage
+    image_resized = cv2.resize(image, (320, 320))
+    results = model(image_resized, conf=conf_threshold)
     
     # Get detection results
     detections = []
