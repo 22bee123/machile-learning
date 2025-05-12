@@ -7,11 +7,24 @@ from datetime import datetime
 from ultralytics import YOLO
 from pathlib import Path
 import base64
+import io
+from PIL import Image
 
 app = Flask(__name__)
 
-# Load the trained model
+# Check if model exists, if not download it
 model_path = os.path.join("crop-disease-detection-using-yolov8", "Crop Disease Detection Using YOLOv8", "runs", "detect", "train3", "weights", "best.pt")
+if not os.path.exists(model_path):
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+    # Import and run the download script
+    import download_model
+    if __name__ == "__main__":
+        download_model.download_file_from_google_drive(
+            "11VI1oY4g-EF0QFZWnQ5XhNFIu470_N5X", 
+            model_path
+        )
+
+# Load the trained model
 model = YOLO(model_path)
 
 # Global variables
@@ -117,6 +130,39 @@ def video_feed():
     return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
+@app.route('/detect_image', methods=['POST'])
+def detect_image():
+    """Process an image from the client-side webcam"""
+    try:
+        data = request.json
+        image_data = data['image']
+        confidence = data.get('confidence', confidence_threshold)
+        
+        # Remove the data URL prefix
+        image_data = image_data.split(',')[1]
+        
+        # Decode base64 image
+        image_bytes = base64.b64decode(image_data)
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # Convert to OpenCV format
+        opencv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        
+        # Process the image
+        result = process_image(opencv_image, confidence)
+        
+        # Convert the annotated image to base64 for sending back to client
+        _, buffer = cv2.imencode('.jpg', result['annotated_image'])
+        annotated_base64 = base64.b64encode(buffer).decode('utf-8')
+        
+        return jsonify({
+            'annotated_image': f'data:image/jpeg;base64,{annotated_base64}',
+            'detections': result['detections'],
+            'disease_detections': result['disease_detections']
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/live_status', methods=['GET'])
 def live_status():
     """Get the current detection status for the live feed"""
@@ -148,6 +194,8 @@ def shutdown():
 
 if __name__ == '__main__':
     try:
-        app.run(debug=True)
+        # Get the PORT from environment variable for Railway
+        port = int(os.environ.get('PORT', 5000))
+        app.run(host='0.0.0.0', port=port, debug=False)
     finally:
         release_camera() 

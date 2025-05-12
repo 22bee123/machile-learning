@@ -145,6 +145,7 @@
         
         .slider {
             -webkit-appearance: none;
+            appearance: none;
             width: 100%;
             height: 6px;
             border-radius: 5px;
@@ -338,151 +339,327 @@
                     <div class="stream-status">
                         <span class="status-pulse"></span>
                         <span>Live</span>
+                overflow-y: auto;
+            }
+            
+            .detection-item {
+                display: flex;
+                justify-content: space-between;
+                padding: 0.5rem 0;
+                border-bottom: 1px solid #e2e8f0;
+            }
+            
+            .detection-item:last-child {
+                border-bottom: none;
+            }
+            
+            .confidence-badge {
+                padding: 0.25rem 0.5rem;
+                border-radius: 999px;
+                font-size: 0.75rem;
+                font-weight: 600;
+                color: white;
+                background-color: var(--primary-color);
+            }
+            
+            .confidence-high {
+                background-color: var(--secondary-color);
+            }
+            
+            .confidence-medium {
+                background-color: var(--warning-color);
+            }
+            
+            .confidence-low {
+                background-color: var(--danger-color);
+            }
+            
+            .footer {
+                text-align: center;
+                padding: 2rem;
+                color: var(--gray-color);
+                font-size: 0.875rem;
+            }
+            
+            .toast {
+                position: fixed;
+                bottom: 2rem;
+                right: 2rem;
+                background-color: white;
+                color: var(--dark-color);
+                padding: 1rem 1.5rem;
+                border-radius: 6px;
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+                z-index: 1000;
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                font-weight: 500;
+                transform: translateY(150%);
+                transition: transform 0.3s ease;
+            }
+            
+            .toast.show {
+                transform: translateY(0);
+            }
+            
+            .toast i {
+                font-size: 1.5rem;
+            }
+            
+            .toast-success i {
+                color: var(--secondary-color);
+            }
+            
+            .toast-error i {
+                color: var(--danger-color);
+            }
+            
+            @media (max-width: 768px) {
+                .container {
+                    padding: 0.5rem;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="container">
+                <div class="header-content">
+                    <div class="logo">
+                        <i class="fas fa-leaf"></i>
+                        Crop Disease Detection
                     </div>
                 </div>
-                
-                <div class="card-body">
-                    <div class="stream-container">
-                        <img src="{{ url_for('video_feed') }}" class="video-stream" id="video-stream">
-                        <div class="placeholder-text" id="placeholder-text">
-                            <i class="fas fa-camera fa-2x"></i>
-                            <p>Video stream loading...</p>
+            </div>
+        </header>
+        
+        <main>
+            <div class="container">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Live Disease Detection</h2>
+                        <div class="stream-status">
+                            <span class="status-pulse"></span>
+                            <span>Live</span>
                         </div>
                     </div>
                     
-                    <div class="confidence-control">
-                        <div class="slider-container">
-                            <div class="slider-header">
+                    <div class="card-body">
+                        <div class="stream-container">
+                            <!-- Client-side webcam video element -->
+                            <video id="webcam" class="video-stream" autoplay playsinline></video>
+                            <canvas id="canvas" style="display:none;"></canvas>
+                            <div class="placeholder-text" id="placeholder-text">
+                                <i class="fas fa-spinner fa-pulse fa-2x"></i>
+                                <p>Waiting for camera access...</p>
+                            </div>
+                        </div>
+                        
+                        <div class="confidence-control">
+                            <div class="slider-container">
                                 <span>Detection Confidence Threshold</span>
                                 <span id="confidence-value">0.5</span>
                             </div>
                             <input type="range" min="0.1" max="0.9" step="0.05" value="0.5" class="slider" id="confidence-slider">
                         </div>
+                        
                     </div>
-                    
                 </div>
             </div>
+        </main>
+        
+        <footer class="footer">
+            <div class="container">
+                <p>&copy; 2025 Crop Disease Detection System | Powered by YOLOv8 and Flask</p>
+            </div>
+        </footer>
+        
+        <div class="toast" id="toast">
+            <i class="fas fa-check-circle"></i>
+            <span id="toast-message"></span>
         </div>
-    </main>
-    
-    <footer class="footer">
-        <div class="container">
-            <p>&copy; 2025 Crop Disease Detection System | Powered by YOLOv8 and Flask</p>
-        </div>
-    </footer>
-    
-    <div class="toast" id="toast">
-        <i class="fas fa-check-circle"></i>
-        <span id="toast-message"></span>
-    </div>
-    
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Elements
-            const confidenceSlider = document.getElementById('confidence-slider');
-            const confidenceValue = document.getElementById('confidence-value');
-            const videoStream = document.getElementById('video-stream');
-            const placeholderText = document.getElementById('placeholder-text');
-            const detectionSummary = document.getElementById('detection-summary');
-            const detectionList = document.getElementById('detection-list');
-            const toast = document.getElementById('toast');
-            
-            // Hide placeholder when stream loads
-            videoStream.onload = function() {
-                placeholderText.style.display = 'none';
-                // Start polling for live status once the stream is loaded
-                startLiveStatusPolling();
-            };
-            
-            // Confidence slider
-            confidenceSlider.addEventListener('input', function() {
-                const value = parseFloat(this.value).toFixed(2);
-                confidenceValue.textContent = value;
-            });
-            
-            confidenceSlider.addEventListener('change', function() {
-                const value = parseFloat(this.value).toFixed(2);
+        
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                // Elements
+                const confidenceSlider = document.getElementById('confidence-slider');
+                const confidenceValue = document.getElementById('confidence-value');
+                const webcam = document.getElementById('webcam');
+                const canvas = document.getElementById('canvas');
+                const webcamPlaceholder = document.getElementById('placeholder-text');
+                const toast = document.getElementById('toast');
+                const captureBtn = document.getElementById('capture-btn');
+                const resultContainer = document.getElementById('result-container');
+                const annotatedImg = document.getElementById('annotated-image');
+                const resultDetails = document.getElementById('result-details');
                 
-                // Update server-side confidence threshold
-                fetch('/adjust_confidence', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ value: value }),
-                })
-                .then(response => response.json())
-                .then(data => {
-                    showToast(`Confidence threshold set to ${data.confidence_threshold}`, 'success');
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showToast('Failed to update confidence threshold', 'error');
+                // Add a capture button below the video
+                const captureContainer = document.createElement('div');
+                captureContainer.className = 'capture-container';
+                captureContainer.style.textAlign = 'center';
+                captureContainer.style.marginTop = '1rem';
+                
+                const captureButton = document.createElement('button');
+                captureButton.id = 'capture-btn';
+                captureButton.className = 'capture-btn';
+                captureButton.innerHTML = '<i class="fas fa-camera"></i> Detect Disease';
+                captureButton.style.padding = '0.75rem 1.5rem';
+                captureButton.style.backgroundColor = 'var(--primary-color)';
+                captureButton.style.color = 'white';
+                captureButton.style.border = 'none';
+                captureButton.style.borderRadius = '6px';
+                captureButton.style.cursor = 'pointer';
+                captureButton.style.fontWeight = '500';
+                captureButton.style.display = 'inline-flex';
+                captureButton.style.alignItems = 'center';
+                captureButton.style.gap = '0.5rem';
+                captureButton.style.transition = 'all 0.3s ease';
+                
+                captureContainer.appendChild(captureButton);
+                document.querySelector('.stream-container').after(captureContainer);
+                
+                // Create result container
+                const resultContainerDiv = document.createElement('div');
+                resultContainerDiv.id = 'result-container';
+                resultContainerDiv.style.marginTop = '1.5rem';
+                resultContainerDiv.style.display = 'none';
+                resultContainerDiv.innerHTML = `
+                    <h3>Detection Result</h3>
+                    <img id="annotated-image" style="max-width:100%; border-radius:6px; box-shadow:var(--card-shadow);" />
+                    <div id="result-details"></div>
+                `;
+                
+                // Confidence slider
+                confidenceSlider.addEventListener('input', function() {
+                    const value = parseFloat(this.value).toFixed(2);
+                    confidenceValue.textContent = value;
                 });
-            });
-            
-            // Live status polling
-            function startLiveStatusPolling() {
-                // Poll for status updates every 500ms
-                setInterval(updateLiveStatus, 500);
-            }
-            
-            function updateLiveStatus() {
-                fetch('/live_status')
-                    .then(response => response.json())
+                
+                // Access user's webcam with better error handling
+                try {
+                    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                        // Show a message to help users understand what's happening
+                        webcamPlaceholder.innerHTML = '<i class="fas fa-spinner fa-pulse fa-2x"></i><p>Requesting camera access...</p>';
+                        
+                        // Add constraints for better compatibility
+                        const constraints = {
+                            video: {
+                                width: { ideal: 640 },
+                                height: { ideal: 480 },
+                                facingMode: "environment" // Prefer rear camera on mobile devices
+                            }
+                        };
+                        
+                        navigator.mediaDevices.getUserMedia(constraints)
+                            .then(function(stream) {
+                                webcam.srcObject = stream;
+                                webcam.onloadedmetadata = function() {
+                                    webcam.play();
+                                    webcamPlaceholder.style.display = 'none';
+                                    canvas.width = webcam.videoWidth;
+                                    canvas.height = webcam.videoHeight;
+                                    console.log('Camera started successfully');
+                                    showToast('Camera connected successfully!', 'success');
+                                };
+                            })
+                            .catch(function(error) {
+                                console.error('Could not access webcam:', error);
+                                webcamPlaceholder.innerHTML = '<i class="fas fa-exclamation-circle fa-2x"></i><p>Could not access webcam: ' + error.message + '</p><p>Please ensure you allow camera access and try again.</p>';
+                                showToast('Camera access denied. Please check permissions.', 'error');
+                            });
+                    } else {
+                        webcamPlaceholder.innerHTML = '<i class="fas fa-exclamation-circle fa-2x"></i><p>Webcam not supported in this browser.</p><p>Please try using Chrome, Firefox, or Edge.</p>';
+                        showToast('Your browser does not support webcam access', 'error');
+                    }
+                } catch (e) {
+                    console.error('Error initializing webcam:', e);
+                    webcamPlaceholder.innerHTML = '<i class="fas fa-exclamation-circle fa-2x"></i><p>Error initializing webcam: ' + e.message + '</p>';
+                    showToast('Error initializing camera', 'error');
+                }
+                
+                // Capture and process image
+                document.getElementById('capture-btn').addEventListener('click', function() {
+                    // Show loading state
+                    this.disabled = true;
+                    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+                    
+                    // Draw current video frame to canvas
+                    canvas.getContext('2d').drawImage(webcam, 0, 0, canvas.width, canvas.height);
+                    // Convert to base64
+                    const dataURL = canvas.toDataURL('image/jpeg');
+                    // Send to backend
+                    fetch('/detect_image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: dataURL, confidence: parseFloat(confidenceSlider.value) })
+                    })
+                    .then(res => res.json())
                     .then(data => {
-                        // Update detection summary
-                        detectionSummary.textContent = data.summary;
+                        // Reset button state
+                        document.getElementById('capture-btn').disabled = false;
+                        document.getElementById('capture-btn').innerHTML = '<i class="fas fa-camera"></i> Detect Disease';
                         
-                        // Update detection list
-                        detectionList.innerHTML = '';
-                        
-                        if (data.detections.length > 0) {
-                            // Only display actual diseases, not just leaf detections
-                            data.detections.forEach(detection => {
-                                // Skip leaf detections
-                                const className = detection.class.toLowerCase();
-                                if (className.endsWith("leaf") || className.endsWith("leafs")) {
-                                    return; // Skip this detection
-                                }
-                                
-                                const li = document.createElement('li');
-                                li.className = 'detection-item';
-                                
-                                // Determine confidence class
+                        if (data.error) {
+                            showToast('Detection failed: ' + data.error, 'error');
+                            return;
+                        }
+                        // Show annotated image
+                        document.getElementById('annotated-image').src = data.annotated_image;
+                        // Show detection details
+                        let html = '';
+                        if (data.disease_detections && data.disease_detections.length > 0) {
+                            html += `<ul style='list-style:none; padding:0; margin-top:1rem;'>`;
+                            data.disease_detections.forEach(det => {
                                 let confidenceClass = 'confidence-medium';
-                                if (detection.confidence > 0.7) {
+                                if (det.confidence > 0.7) {
                                     confidenceClass = 'confidence-high';
-                                } else if (detection.confidence < 0.5) {
+                                } else if (det.confidence < 0.5) {
                                     confidenceClass = 'confidence-low';
                                 }
                                 
-                                li.innerHTML = `
-                                    <span>${detection.class}</span>
-                                    <span class="confidence-badge ${confidenceClass}">
-                                        ${(detection.confidence * 100).toFixed(1)}%
-                                    </span>
-                                `;
-                                detectionList.appendChild(li);
+                                html += `<li style='display:flex; justify-content:space-between; margin-bottom:0.5rem; padding:0.5rem; background-color:#f8fafc; border-radius:4px;'>
+                                    <span>${det.class}</span>
+                                    <span class='${confidenceClass}' style='font-weight:500;'>${(det.confidence*100).toFixed(1)}%</span>
+                                </li>`;
                             });
+                            html += `</ul>`;
+                        } else {
+                            html = '<p style="margin-top:1rem;">No diseases detected - Plant appears healthy</p>';
                         }
+                        document.getElementById('result-details').innerHTML = html;
+                        document.getElementById('result-container').style.display = 'block';
+                        showToast('Detection complete!', 'success');
                     })
-                    .catch(error => {
-                        console.error('Error fetching live status:', error);
+                    .catch(err => {
+                        // Reset button state
+                        document.getElementById('capture-btn').disabled = false;
+                        document.getElementById('capture-btn').innerHTML = '<i class="fas fa-camera"></i> Detect Disease';
+                        showToast('Detection failed: ' + err, 'error');
                     });
-            }
-            
-            // Toast function
-            function showToast(message, type = 'success') {
-                toast.className = `toast show toast-${type}`;
-                toast.innerHTML = `
-                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
-                    <span>${message}</span>
-                `;
+                });
                 
-                setTimeout(() => {
-                    toast.className = 'toast';
-                }, 3000);
+                // Toast function
+                function showToast(message, type = 'success') {
+                    toast.className = `toast show toast-${type}`;
+                    toast.innerHTML = `
+                        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+                        <span>${message}</span>
+                    `;
+                    
+                    setTimeout(() => {
+                        toast.className = 'toast';
+                    }, 3000);
+                }
+                
+                // Handle page unload
+                window.addEventListener('beforeunload', function() {
+                    // Attempt to release camera resources if webcam is active
+                    if (webcam.srcObject) {
+                        const tracks = webcam.srcObject.getTracks();
+                        tracks.forEach(track => track.stop());
+                    }
+                });
             }
             
             // Handle page unload
